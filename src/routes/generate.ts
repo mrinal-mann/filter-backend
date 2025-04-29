@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import { OpenAI, toFile } from "openai";
 import { getPromptForFilter } from "../utils/prompts";
+import { sendNotification } from "../utils/firebase";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -82,7 +83,7 @@ router.post(
   "/",
   upload.single("image"),
   async (req: Request, res: Response) => {
-    const { filter } = req.body;
+    const { filter, fcmToken } = req.body;
     const imagePath = req.file?.path;
     let filesToCleanup: string[] = [];
 
@@ -104,9 +105,13 @@ router.post(
 
       // Convert the image to OpenAI compatible format with explicit MIME type
       console.log("Converting image to OpenAI format...");
-      const imageFile = await toFile(fs.createReadStream(imagePath), path.basename(imagePath), {
-        type: "image/png"
-      });
+      const imageFile = await toFile(
+        fs.createReadStream(imagePath),
+        path.basename(imagePath),
+        {
+          type: "image/png",
+        }
+      );
 
       // Call OpenAI API for image editing using gpt-image-1
       console.log("Calling OpenAI image edit API with gpt-image-1...");
@@ -119,24 +124,47 @@ router.post(
       // Clean up uploaded file
       filesToCleanup.forEach((file) => safeDeleteFile(file));
 
-      // Return the result - prioritize b64_json for better quality
+      // Get result
+      let imageUrl;
       if (response.data?.[0]?.b64_json) {
         // If b64_json is available, create a data URL
         const b64Data = response.data[0].b64_json;
-        const dataUrl = `data:image/png;base64,${b64Data}`;
-        res.json({ imageUrl: dataUrl });
+        imageUrl = `data:image/png;base64,${b64Data}`;
       } else if (response.data?.[0]?.url) {
         // Fallback to URL if available
-        res.json({ imageUrl: response.data[0].url });
+        imageUrl = response.data[0].url;
       } else {
         res.status(500).json({ error: "No image data returned from OpenAI" });
+        return;
       }
+
+      // If we have an FCM token, send notification
+      if (fcmToken) {
+        console.log(
+          `Sending FCM notification to token: ${fcmToken.substring(0, 10)}...`
+        );
+
+        // Send FCM notification
+        await sendNotification(
+          fcmToken,
+          `${filter} Filter Complete! 🎉`,
+          "Your image has been processed successfully. Tap to view it now.",
+          {
+            notificationType: "image_ready",
+            imageUrl,
+            filter,
+          }
+        );
+      }
+
+      // Return the result
+      res.json({ imageUrl });
     } catch (error: any) {
       console.error("Error processing image:", error);
-      
+
       // Enhanced error logging
       console.error("Error details:", JSON.stringify(error, null, 2));
-      
+
       // Clean up all temp files even if there was an error
       filesToCleanup.forEach((file) => safeDeleteFile(file));
 
