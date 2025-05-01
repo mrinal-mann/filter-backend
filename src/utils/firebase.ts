@@ -47,53 +47,53 @@ try {
 }
 
 // Function to send FCM notification
-export const sendNotification = async (
-  token: string,
-  title: string,
-  body: string,
-  data: any = {}
-) => {
-  if (!firebaseInitialized) {
-    console.warn("Firebase not initialized. Cannot send notification.");
-    return false;
-  }
+// export const sendNotification = async (
+//   token: string,
+//   title: string,
+//   body: string,
+//   data: any = {}
+// ) => {
+//   if (!firebaseInitialized) {
+//     console.warn("Firebase not initialized. Cannot send notification.");
+//     return false;
+//   }
 
-  try {
-    // Convert all data values to strings as required by FCM
-    const stringData: Record<string, string> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      stringData[key] =
-        typeof value === "string" ? value : JSON.stringify(value);
-    });
+//   try {
+//     // Convert all data values to strings as required by FCM
+//     const stringData: Record<string, string> = {};
+//     Object.entries(data).forEach(([key, value]) => {
+//       stringData[key] =
+//         typeof value === "string" ? value : JSON.stringify(value);
+//     });
 
-    const message = {
-      token,
-      notification: {
-        title,
-        body,
-      },
-      data: stringData,
-      android: {
-        priority: "high" as const, // Use const assertion to make it a literal type
-        notification: {
-          channelId: "image-processing",
-          priority: "max" as const,
-        },
-      },
-      apns: {
-        payload: {
-          aps: {
-            contentAvailable: true,
-          },
-        },
-      },
-    };
+//     const message = {
+//       token,
+//       notification: {
+//         title,
+//         body,
+//       },
+//       data: stringData,
+//       android: {
+//         priority: "high" as const, // Use const assertion to make it a literal type
+//         notification: {
+//           channelId: "image-processing",
+//           priority: "max" as const,
+//         },
+//       },
+//       apns: {
+//         payload: {
+//           aps: {
+//             contentAvailable: true,
+//           },
+//         },
+//       },
+//     };
 
-    const response = await admin.messaging().send(message);
-    console.log("FCM notification sent successfully:", response);
-    return true;
-  } catch (error) {
-    console.error("Error sending FCM notification:", error);
-    return false;
-  }
-};
+//     const response = await admin.messaging().send(message);
+//     console.log("FCM notification sent successfully:", response);
+//     return true;
+//   } catch (error) {
+//     console.error("Error sending FCM notification:", error);
+//     return false;
+//   }
+// };

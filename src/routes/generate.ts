@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { OpenAI, toFile } from "openai";
 import { getPromptForFilter } from "../utils/prompts";
-import { sendNotification } from "../utils/firebase";
+// import { sendNotification } from "../utils/firebase";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -139,23 +139,23 @@ router.post(
       }
 
       // If we have an FCM token, send notification
-      if (fcmToken) {
-        console.log(
-          `Sending FCM notification to token: ${fcmToken.substring(0, 10)}...`
-        );
+      // if (fcmToken) {
+      //   console.log(
+      //     `Sending FCM notification to token: ${fcmToken.substring(0, 10)}...`
+      //   );
 
-        // Send FCM notification
-        await sendNotification(
-          fcmToken,
-          `${filter} Filter Complete! 🎉`,
-          "Your image has been processed successfully. Tap to view it now.",
-          {
-            notificationType: "image_ready",
-            imageUrl,
-            filter,
-          }
-        );
-      }
+      //   // Send FCM notification
+      //   await sendNotification(
+      //     fcmToken,
+      //     `${filter} Filter Complete! 🎉`,
+      //     "Your image has been processed successfully. Tap to view it now.",
+      //     {
+      //       notificationType: "image_ready",
+      //       imageUrl,
+      //       filter,
+      //     }
+      //   );
+      // }
 
       // Return the result
       res.json({ imageUrl });
