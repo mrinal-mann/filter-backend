@@ -2,7 +2,7 @@
 import admin from "firebase-admin";
 import dotenv from "dotenv";
 
-dotenv.config();
+dotenv.config({ path: ".env.production" });
 
 // Initialize Firebase Admin
 let firebaseInitialized = false;
@@ -11,7 +11,7 @@ try {
   // Check if required environment variables are set
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'); // Handle newline characters
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'); 
 
   if (projectId && clientEmail && privateKey) {
     // Initialize with environment variables

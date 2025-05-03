@@ -10,7 +10,7 @@ import dotenv from "dotenv";
 import { createReadStreamFromGCS, deleteFile } from "../utils/cloudStorage";
 import { uploadFile } from "../utils/cloudStorage";
 
-dotenv.config();
+dotenv.config({ path: ".env.production" });
 
 // Ensure uploads directory exists
 const uploadsDir = "uploads";

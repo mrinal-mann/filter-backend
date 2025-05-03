@@ -5,7 +5,9 @@ import generateRoute from "./routes/generate";
 import fs from "fs";
 import path from "path";
 
-dotenv.config();
+// Load environment variables from .env.production
+dotenv.config({ path: ".env.production" });
+
 const app = express();
 
 // Ensure uploads directory exists

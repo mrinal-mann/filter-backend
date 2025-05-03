@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: filter-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GCS_BUCKET_NAME
+        value: pixmix-6a12e.firebasestorage.app

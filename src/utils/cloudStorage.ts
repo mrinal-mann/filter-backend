@@ -1,9 +1,43 @@
 import { Storage } from '@google-cloud/storage';
 import { Readable } from 'stream';
 import path from 'path';
+import dotenv from 'dotenv';
 
-const storage = new Storage();
-const bucketName = 'pixmix-6a12e.firebasestorage.app';
+dotenv.config({ path: ".env.production" });
+
+// Initialize Storage with credentials from environment variables
+let storage: Storage;
+
+try {
+  // Check if we have Firebase credentials in environment variables
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (projectId && clientEmail && privateKey) {
+    // Use Firebase credentials for GCS
+    storage = new Storage({
+      projectId,
+      credentials: {
+        client_email: clientEmail,
+        private_key: privateKey
+      }
+    });
+    console.log('Initialized Google Cloud Storage with Firebase credentials');
+  } else {
+    // Fallback to default credentials
+    storage = new Storage();
+    console.log('Initialized Google Cloud Storage with default credentials');
+  }
+} catch (error) {
+  console.error('Error initializing Google Cloud Storage:', error);
+  // Fallback to default credentials
+  storage = new Storage();
+}
+
+// Use the correct bucket name
+const bucketName = process.env.GCS_BUCKET_NAME || 'pixmix-6a12e.firebasestorage.app';
+console.log(`Using Cloud Storage bucket: ${bucketName}`);
 
 // Ensure bucket exists
 async function ensureBucketExists() {
@@ -36,15 +70,16 @@ export async function uploadFile(localFilePath: string): Promise<string> {
   // Return the GCS path correctly
   return `gs://${bucketName}/${destination}`;
 }
+
 // Download file from Cloud Storage
 export async function downloadFile(gcsPath: string, localPath: string): Promise<string> {
   // Extract bucket and filename from GCS path
   const matches = gcsPath.match(/gs:\/\/([^\/]+)\/(.+)/);
   if (!matches) throw new Error(`Invalid GCS path: ${gcsPath}`);
   
-  const [, bucketName, filePath] = matches;
+  const [, gsBucketName, filePath] = matches;
   
-  await storage.bucket(bucketName).file(filePath).download({
+  await storage.bucket(gsBucketName).file(filePath).download({
     destination: localPath,
   });
   
@@ -57,9 +92,9 @@ export async function deleteFile(gcsPath: string): Promise<void> {
   const matches = gcsPath.match(/gs:\/\/([^\/]+)\/(.+)/);
   if (!matches) throw new Error(`Invalid GCS path: ${gcsPath}`);
   
-  const [, bucketName, filePath] = matches;
+  const [, gsBucketName, filePath] = matches;
   
-  await storage.bucket(bucketName).file(filePath).delete();
+  await storage.bucket(gsBucketName).file(filePath).delete();
 }
 
 // Create a readable stream from a Cloud Storage file
@@ -68,7 +103,7 @@ export async function createReadStreamFromGCS(gcsPath: string): Promise<Readable
   const matches = gcsPath.match(/gs:\/\/([^\/]+)\/(.+)/);
   if (!matches) throw new Error(`Invalid GCS path: ${gcsPath}`);
   
-  const [, bucketName, filePath] = matches;
+  const [, gsBucketName, filePath] = matches;
   
-  return storage.bucket(bucketName).file(filePath).createReadStream();
+  return storage.bucket(gsBucketName).file(filePath).createReadStream();
 }
