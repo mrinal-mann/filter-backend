@@ -10,17 +10,20 @@ RUN npm install
 # Copy app source
 COPY . .
 
+# Create uploads directory
+RUN mkdir -p uploads
+# Set the right permissions
+RUN chmod 777 uploads
+
 # Build TypeScript code
 RUN npm run build
 
-# Create uploads directory
-RUN mkdir -p uploads
-
 # Set environment variables
 ENV NODE_ENV=production
+ENV PORT=3000
 
 # Expose the port
-EXPOSE 8080
+EXPOSE 3000
 
 # Start the server
 CMD ["node", "dist/index.js"]

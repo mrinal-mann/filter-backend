@@ -1,34 +1,33 @@
 // src/utils/firebase.ts
 import admin from "firebase-admin";
-import fs from "fs";
-import path from "path";
 import dotenv from "dotenv";
 
 dotenv.config();
-
-// Path to your service account file
-const SERVICE_ACCOUNT_PATH =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  path.join(process.cwd(), "firebase-service-account.json");
 
 // Initialize Firebase Admin
 let firebaseInitialized = false;
 
 try {
-  if (fs.existsSync(SERVICE_ACCOUNT_PATH)) {
-    const serviceAccount = JSON.parse(
-      fs.readFileSync(SERVICE_ACCOUNT_PATH, "utf8")
-    );
+  // Check if required environment variables are set
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'); // Handle newline characters
 
+  if (projectId && clientEmail && privateKey) {
+    // Initialize with environment variables
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey,
+      }),
     });
 
-    console.log("Firebase Admin SDK initialized successfully");
+    console.log("Firebase Admin SDK initialized successfully using environment variables");
     firebaseInitialized = true;
   } else {
     console.warn(
-      `Firebase service account file not found at: ${SERVICE_ACCOUNT_PATH}`
+      "Firebase environment variables not found (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)"
     );
     console.warn("FCM notifications will not be available");
 
@@ -97,3 +96,5 @@ try {
 //     return false;
 //   }
 // };
+
+export default admin;

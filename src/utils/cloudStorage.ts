@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import path from 'path';
 
 const storage = new Storage();
-const bucketName = 'gs://pixmix-6a12e.firebasestorage.app'; // Replace with your bucket name
+const bucketName = 'pixmix-6a12e.firebasestorage.app';
 
 // Ensure bucket exists
 async function ensureBucketExists() {
@@ -33,10 +33,9 @@ export async function uploadFile(localFilePath: string): Promise<string> {
     },
   });
   
-  // Return the GCS path
+  // Return the GCS path correctly
   return `gs://${bucketName}/${destination}`;
 }
-
 // Download file from Cloud Storage
 export async function downloadFile(gcsPath: string, localPath: string): Promise<string> {
   // Extract bucket and filename from GCS path
