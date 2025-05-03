@@ -7,6 +7,8 @@ import { OpenAI, toFile } from "openai";
 import { getPromptForFilter } from "../utils/prompts";
 // import { sendNotification } from "../utils/firebase";
 import dotenv from "dotenv";
+import { createReadStreamFromGCS, deleteFile } from "../utils/cloudStorage";
+import { uploadFile } from "../utils/cloudStorage";
 
 dotenv.config();
 
@@ -86,6 +88,7 @@ router.post(
     const { filter, fcmToken } = req.body;
     const imagePath = req.file?.path;
     let filesToCleanup: string[] = [];
+    let gcsPath: string | null = null;
 
     // Log uploaded file details
     logFileDetails(req.file);
@@ -103,10 +106,17 @@ router.post(
       const prompt = getPromptForFilter(filter);
       console.log(`Using prompt: ${prompt}`);
 
+      // Upload the file to GCS first
+      gcsPath = await uploadFile(imagePath);
+      console.log(`Uploaded image to GCS: ${gcsPath}`);
+
+      // Get a stream directly from GCS
+      const imageStream = await createReadStreamFromGCS(gcsPath);
+
       // Convert the image to OpenAI compatible format with explicit MIME type
       console.log("Converting image to OpenAI format...");
       const imageFile = await toFile(
-        fs.createReadStream(imagePath),
+        imageStream,
         path.basename(imagePath),
         {
           type: "image/png",
@@ -121,8 +131,13 @@ router.post(
         prompt: prompt,
       });
 
-      // Clean up uploaded file
+      // Clean up uploaded file locally
       filesToCleanup.forEach((file) => safeDeleteFile(file));
+      
+      // Clean up file in GCS if it was uploaded
+      if (gcsPath) {
+        await deleteFile(gcsPath);
+      }
 
       // Get result
       let imageUrl;
@@ -138,25 +153,6 @@ router.post(
         return;
       }
 
-      // If we have an FCM token, send notification
-      // if (fcmToken) {
-      //   console.log(
-      //     `Sending FCM notification to token: ${fcmToken.substring(0, 10)}...`
-      //   );
-
-      //   // Send FCM notification
-      //   await sendNotification(
-      //     fcmToken,
-      //     `${filter} Filter Complete! 🎉`,
-      //     "Your image has been processed successfully. Tap to view it now.",
-      //     {
-      //       notificationType: "image_ready",
-      //       imageUrl,
-      //       filter,
-      //     }
-      //   );
-      // }
-
       // Return the result
       res.json({ imageUrl });
     } catch (error: any) {
@@ -167,6 +163,15 @@ router.post(
 
       // Clean up all temp files even if there was an error
       filesToCleanup.forEach((file) => safeDeleteFile(file));
+      
+      // Clean up file in GCS if it was uploaded
+      if (gcsPath) {
+        try {
+          await deleteFile(gcsPath);
+        } catch (e) {
+          console.error("Error deleting GCS file:", e);
+        }
+      }
 
       res.status(500).json({
         error: "Image processing failed",
