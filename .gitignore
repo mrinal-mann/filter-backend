@@ -8,3 +8,4 @@ firebase-service-account.json
 .env.production.local
 .env.production
 
+dist/

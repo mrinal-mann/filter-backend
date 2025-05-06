@@ -5,3 +5,4 @@ npm-debug.log
 .gitignore
 .dockerignore
 .env.production
+dist               
