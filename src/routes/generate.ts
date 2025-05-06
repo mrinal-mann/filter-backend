@@ -148,7 +148,18 @@ router.post(
         res.status(500).json({ error: "No image data returned from OpenAI" });
         return;
       }
-
+      if (fcmToken) {
+        console.log("Sending FCM notification to token:", fcmToken);
+        await sendNotification(
+          fcmToken,
+          "Image Ready!",
+          `Your ${filter} filtered image is ready to view.`,
+          {
+            notificationType: "image_ready",
+            imageUrl,
+          }
+        );
+      }
       // Return the result
       res.json({ imageUrl });
     } catch (error: any) {
