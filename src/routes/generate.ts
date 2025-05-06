@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { OpenAI, toFile } from "openai";
 import { getPromptForFilter } from "../utils/prompts";
-// import { sendNotification } from "../utils/firebase";
+import { sendNotification } from "../utils/firebase";
 import dotenv from "dotenv";
 import { createReadStreamFromGCS, deleteFile } from "../utils/cloudStorage";
 import { uploadFile } from "../utils/cloudStorage";
@@ -115,13 +115,9 @@ router.post(
 
       // Convert the image to OpenAI compatible format with explicit MIME type
       console.log("Converting image to OpenAI format...");
-      const imageFile = await toFile(
-        imageStream,
-        path.basename(imagePath),
-        {
-          type: "image/png",
-        }
-      );
+      const imageFile = await toFile(imageStream, path.basename(imagePath), {
+        type: "image/png",
+      });
 
       // Call OpenAI API for image editing using gpt-image-1
       console.log("Calling OpenAI image edit API with gpt-image-1...");
@@ -133,7 +129,7 @@ router.post(
 
       // Clean up uploaded file locally
       filesToCleanup.forEach((file) => safeDeleteFile(file));
-      
+
       // Clean up file in GCS if it was uploaded
       if (gcsPath) {
         await deleteFile(gcsPath);
@@ -163,7 +159,7 @@ router.post(
 
       // Clean up all temp files even if there was an error
       filesToCleanup.forEach((file) => safeDeleteFile(file));
-      
+
       // Clean up file in GCS if it was uploaded
       if (gcsPath) {
         try {
