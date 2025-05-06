@@ -17,7 +17,6 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
   console.log(`Created uploads directory at ${uploadsDir}`);
 }
-
 // Add explicit CORS headers before other middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -60,7 +59,7 @@ app.get("/health", (req, res) => {
 });
 
 // Use PORT from environment variable or fallback to 3000
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () =>
   console.log(`Server running at http://localhost:${PORT}`)
 );
