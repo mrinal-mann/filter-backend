@@ -1,21 +1,24 @@
-// src/routes/generate.ts
+/**
+ * Image Generation Route
+ * Handles image processing requests from the frontend
+ */
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
 import { OpenAI, toFile } from "openai";
 import { getPromptForFilter } from "../utils/prompts";
-import { sendNotification } from "../utils/firebase";
-import dotenv from "dotenv";
-import { createReadStreamFromGCS, deleteFile } from "../utils/cloudStorage";
-import { uploadFile } from "../utils/cloudStorage";
+import { sendNotification } from "../services/notifications";
+import { uploadFile, deleteFile, createReadStreamFromGCS } from "../utils/cloudStorage";
 
-dotenv.config({ path: ".env.production" });
+const router = Router();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Ensure uploads directory exists
-const uploadsDir = "uploads";
+const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log(`Created uploads directory at ${uploadsDir}`);
 }
 
 // Configure multer storage
@@ -30,7 +33,7 @@ const storage = multer.diskStorage({
   },
 });
 
-// Create file filter to accept images
+// Create file filter to accept only images
 const fileFilter = (
   req: any,
   file: Express.Multer.File,
@@ -51,9 +54,6 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max size
 });
 
-const router = Router();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 // Helper function to safely delete a file
 const safeDeleteFile = (filePath: string): void => {
   try {
@@ -66,21 +66,7 @@ const safeDeleteFile = (filePath: string): void => {
   }
 };
 
-// Helper function to log file details
-const logFileDetails = (file: Express.Multer.File | undefined) => {
-  if (!file) {
-    console.log("No file uploaded");
-    return;
-  }
-
-  console.log("File upload details:");
-  console.log(`Filename: ${file.filename}`);
-  console.log(`Original name: ${file.originalname}`);
-  console.log(`Size: ${(file.size / (1024 * 1024)).toFixed(2)}MB`);
-  console.log(`MIME type: ${file.mimetype}`);
-  console.log(`Path: ${file.path}`);
-};
-
+// Process image endpoint
 router.post(
   "/",
   upload.single("image"),
@@ -90,12 +76,9 @@ router.post(
     let filesToCleanup: string[] = [];
     let gcsPath: string | null = null;
 
-    // Log uploaded file details
-    logFileDetails(req.file);
-
+    // Validate uploaded file
     if (!imagePath || !fs.existsSync(imagePath)) {
-      res.status(400).json({ error: "Image not uploaded or invalid format" });
-      return;
+      return res.status(400).json({ error: "Image not uploaded or invalid format" });
     }
 
     // Add original file to cleanup list
@@ -104,50 +87,53 @@ router.post(
     try {
       console.log(`Processing image with filter: ${filter}`);
       const prompt = getPromptForFilter(filter);
-      console.log(`Using prompt: ${prompt}`);
-
-      // Upload the file to GCS first
+      
+      // Upload the file to GCS first for backup and better stream handling
       gcsPath = await uploadFile(imagePath);
       console.log(`Uploaded image to GCS: ${gcsPath}`);
 
       // Get a stream directly from GCS
       const imageStream = await createReadStreamFromGCS(gcsPath);
 
-      // Convert the image to OpenAI compatible format with explicit MIME type
+      // Convert the image to OpenAI compatible format
       console.log("Converting image to OpenAI format...");
       const imageFile = await toFile(imageStream, path.basename(imagePath), {
         type: "image/png",
       });
 
-      // Call OpenAI API for image editing using gpt-image-1
-      console.log("Calling OpenAI image edit API with gpt-image-1...");
+      // Call OpenAI API for image editing
+      console.log("Calling OpenAI image edit API...");
       const response = await openai.images.edit({
         model: "gpt-image-1",
         image: imageFile,
         prompt: prompt,
       });
 
-      // Clean up uploaded file locally
+      // Clean up all temporary files
       filesToCleanup.forEach((file) => safeDeleteFile(file));
-
+      
       // Clean up file in GCS if it was uploaded
       if (gcsPath) {
-        await deleteFile(gcsPath);
+        try {
+          await deleteFile(gcsPath);
+        } catch (e) {
+          console.error("Error deleting GCS file:", e);
+        }
       }
 
-      // Get result
+      // Get result image URL
       let imageUrl;
       if (response.data?.[0]?.b64_json) {
         // If b64_json is available, create a data URL
-        const b64Data = response.data[0].b64_json;
-        imageUrl = `data:image/png;base64,${b64Data}`;
+        imageUrl = `data:image/png;base64,${response.data[0].b64_json}`;
       } else if (response.data?.[0]?.url) {
         // Fallback to URL if available
         imageUrl = response.data[0].url;
       } else {
-        res.status(500).json({ error: "No image data returned from OpenAI" });
-        return;
+        return res.status(500).json({ error: "No image data returned from OpenAI" });
       }
+
+      // Send FCM notification if token provided
       if (fcmToken) {
         console.log("Sending FCM notification to token:", fcmToken);
         await sendNotification(
@@ -157,9 +143,11 @@ router.post(
           {
             notificationType: "image_ready",
             imageUrl,
+            filterType: filter
           }
         );
       }
+
       // Return the result
       res.json({ imageUrl });
     } catch (error: any) {
