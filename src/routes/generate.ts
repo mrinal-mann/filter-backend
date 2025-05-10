@@ -9,7 +9,11 @@ import path from "path";
 import { OpenAI, toFile } from "openai";
 import { getPromptForFilter } from "../utils/prompts";
 import { sendNotification } from "../services/notifications";
-import { uploadFile, deleteFile, createReadStreamFromGCS } from "../utils/cloudStorage";
+import {
+  uploadFile,
+  deleteFile,
+  createReadStreamFromGCS,
+} from "../utils/cloudStorage";
 
 const router = Router();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -78,7 +82,8 @@ router.post(
 
     // Validate uploaded file
     if (!imagePath || !fs.existsSync(imagePath)) {
-      return res.status(400).json({ error: "Image not uploaded or invalid format" });
+      res.status(400).json({ error: "Image not uploaded or invalid format" });
+      return;
     }
 
     // Add original file to cleanup list
@@ -87,7 +92,7 @@ router.post(
     try {
       console.log(`Processing image with filter: ${filter}`);
       const prompt = getPromptForFilter(filter);
-      
+
       // Upload the file to GCS first for backup and better stream handling
       gcsPath = await uploadFile(imagePath);
       console.log(`Uploaded image to GCS: ${gcsPath}`);
@@ -111,7 +116,7 @@ router.post(
 
       // Clean up all temporary files
       filesToCleanup.forEach((file) => safeDeleteFile(file));
-      
+
       // Clean up file in GCS if it was uploaded
       if (gcsPath) {
         try {
@@ -130,22 +135,29 @@ router.post(
         // Fallback to URL if available
         imageUrl = response.data[0].url;
       } else {
-        return res.status(500).json({ error: "No image data returned from OpenAI" });
+        res.status(500).json({ error: "No image data returned from OpenAI" });
+        return;
       }
 
       // Send FCM notification if token provided
       if (fcmToken) {
         console.log("Sending FCM notification to token:", fcmToken);
-        await sendNotification(
-          fcmToken,
-          "Image Ready!",
-          `Your ${filter} filtered image is ready to view.`,
-          {
-            notificationType: "image_ready",
-            imageUrl,
-            filterType: filter
-          }
-        );
+        try {
+          await sendNotification(
+            fcmToken,
+            "Image Ready!",
+            `Your ${filter} filtered image is ready to view.`,
+            {
+              notificationType: "image_ready",
+              imageUrl,
+              filterType: filter,
+            }
+          );
+          console.log("FCM notification sent successfully");
+        } catch (notificationError) {
+          // Log but don't fail the request if notification fails
+          console.error("Error sending notification:", notificationError);
+        }
       }
 
       // Return the result

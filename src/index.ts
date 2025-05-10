@@ -53,7 +53,22 @@ app.use(cors(corsOptions));
 
 // Routes - using the simplified route
 app.use("/generate", verifyToken, generateRoute);
+app.post("/register-device", express.json(), async (req, res) => {
+  try {
+    const { deviceToken, platform } = req.body;
 
+    // Here you would store the token in your database
+    console.log(
+      `Registering device token: ${deviceToken} for platform: ${platform}`
+    );
+
+    // For now, just return success
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Error registering device:", error);
+    res.status(500).json({ error: "Failed to register device" });
+  }
+});
 // Simple health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });

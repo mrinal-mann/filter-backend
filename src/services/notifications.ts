@@ -1,21 +1,27 @@
 /**
  * Notification Service
- * Handles FCM notification logic for the filter backend
+ * Handles FCM notifications from the backend to the frontend
  */
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 
+// Load environment variables
 dotenv.config();
 
+// Auth service URL for getting FCM tokens
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'https://gcloud-authentication-493914627855.us-central1.run.app';
+
+// FCM API URL
 const FCM_API_URL = 'https://fcm.googleapis.com/v1/projects/pixmix-6a12e/messages:send';
 
 /**
  * Gets an FCM authorization token from the auth service
+ * @returns Promise with the FCM token
  */
-async function getFCMAuthToken() {
+async function getFCMAuthToken(): Promise<string> {
   try {
     const response = await fetch(`${AUTH_SERVICE_URL}/auth/fcm-token`);
+    
     if (!response.ok) {
       throw new Error(`Failed to get FCM token: ${response.status}`);
     }
@@ -32,10 +38,17 @@ async function getFCMAuthToken() {
  * Sends an FCM notification when image processing is complete
  * 
  * @param deviceToken The FCM token of the target device
- * @param imageUrl URL of the processed image
- * @param filterType The filter that was applied
+ * @param title Notification title
+ * @param body Notification body
+ * @param data Additional data to send with the notification
+ * @returns Promise with the FCM response
  */
-async function sendNotification(deviceToken: string, imageUrl: string, filterType: string) {
+async function sendNotification(
+  deviceToken: string, 
+  title: string, 
+  body: string, 
+  data: Record<string, any> = {}
+): Promise<any> {
   try {
     // Get FCM OAuth token from the auth service
     const fcmToken = await getFCMAuthToken();
@@ -45,17 +58,14 @@ async function sendNotification(deviceToken: string, imageUrl: string, filterTyp
       message: {
         token: deviceToken,
         notification: {
-          title: "Image Ready!",
-          body: `Your ${filterType} filter has been applied successfully.`
+          title,
+          body
         },
         data: {
-          notificationType: "image_ready",
-          imageUrl: imageUrl,
-          filterType: filterType,
-          channelId: "image-processing",
+          ...data,
           // These are required for Expo managed projects
-          experienceId: '@yourUsername/filter-frontend',
-          scopeKey: '@yourUsername/filter-frontend',
+          experienceId: '@pixmix/filter-frontend',
+          scopeKey: '@pixmix/filter-frontend',
         },
         android: {
           notification: {
@@ -88,7 +98,8 @@ async function sendNotification(deviceToken: string, imageUrl: string, filterTyp
   }
 }
 
-module.exports = {
+// Export the functions
+export {
   getFCMAuthToken,
   sendNotification
 };
