@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import generateRoute from "./routes/generate";
 import fs from "fs";
 import path from "path";
+import { verifyToken } from "./middleware/authMiddleware";
 
 // Load environment variables from .env.production
 dotenv.config({ path: ".env.production" });
@@ -38,7 +39,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Configure CORS to allow requests from any origin during development
 const corsOptions = {
   origin: "*", // Allow all origins
-  methods: ["GET", "POST"], // Allow GET and POST methods
+  methods: ["GET", "POST", "OPTIONS"], // Allow GET and POST methods
   allowedHeaders: ["Content-Type", "Authorization"], // Allow these headers
   optionsSuccessStatus: 200, // For legacy browser support
 };
@@ -51,7 +52,7 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cors(corsOptions));
 
 // Routes - using the simplified route
-app.use("/generate", generateRoute);
+app.use("/generate", verifyToken, generateRoute);
 
 // Simple health check endpoint
 app.get("/health", (req, res) => {
