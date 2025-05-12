@@ -21,19 +21,11 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Configure CORS properly
 const corsOptions = {
-<<<<<<< HEAD
   origin: "*", // Allow all origins
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
   optionsSuccessStatus: 200,
-=======
-  origin: ["http://localhost:8081", "http://localhost:3000", "*"], // Allow localhost and other origins
-  methods: ["GET", "POST", "OPTIONS"], // Allow GET and POST methods
-  allowedHeaders: ["Content-Type", "Authorization"], // Allow these headers
-  credentials: true,
-  optionsSuccessStatus: 204, // For legacy browser support
->>>>>>> dbb9c8e974071ad39dde4ec537e880747f2e879d
 };
 
 // Apply CORS middleware first
