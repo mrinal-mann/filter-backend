@@ -143,16 +143,7 @@ router.post(
       if (fcmToken) {
         console.log("Sending FCM notification to token:", fcmToken);
         try {
-          await sendNotification(
-            fcmToken,
-            "Image Ready!",
-            `Your ${filter} filtered image is ready to view.`,
-            {
-              notificationType: "image_ready",
-              imageUrl,
-              filterType: filter,
-            }
-          );
+          await sendNotification(fcmToken, imageUrl, filter);
           console.log("FCM notification sent successfully");
         } catch (notificationError) {
           // Log but don't fail the request if notification fails

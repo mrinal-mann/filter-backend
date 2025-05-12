@@ -6,7 +6,8 @@ import generateRoute from "./routes/generate";
 import fs from "fs";
 import path from "path";
 import { verifyToken } from "./middleware/authMiddleware";
-
+import { firestore } from "./config/firebase";
+import admin from "firebase-admin";
 // Load environment variables from .env.production
 dotenv.config({ path: ".env.production" });
 
@@ -38,19 +39,21 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // Routes
 app.use("/generate", verifyToken, generateRoute);
 
-app.post("/register-device", express.json(), async (req, res) => {
+app.post("/register-device", verifyToken, async (req, res) => {
   try {
     const { deviceToken, platform } = req.body;
+    const userId = req.user?.uid;
 
-    // Here you would store the token in your database
-    console.log(
-      `Registering device token: ${deviceToken} for platform: ${platform}`
-    );
+    await firestore.collection("devices").doc(deviceToken).set({
+      token: deviceToken,
+      platform,
+      userId,
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-    // For now, just return success
-    res.status(200).json({ success: true });
+    res.json({ success: true });
   } catch (error) {
-    console.error("Error registering device:", error);
+    console.error("Device registration error:", error);
     res.status(500).json({ error: "Failed to register device" });
   }
 });
