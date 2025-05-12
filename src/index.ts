@@ -38,10 +38,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 // Configure CORS to allow requests from any origin during development
 const corsOptions = {
-  origin: "*", // Allow all origins
+  origin: ["http://localhost:8081", "http://localhost:3000", "*"], // Allow localhost and other origins
   methods: ["GET", "POST", "OPTIONS"], // Allow GET and POST methods
   allowedHeaders: ["Content-Type", "Authorization"], // Allow these headers
-  optionsSuccessStatus: 200, // For legacy browser support
+  credentials: true,
+  optionsSuccessStatus: 204, // For legacy browser support
 };
 
 // Increase the payload size limits
