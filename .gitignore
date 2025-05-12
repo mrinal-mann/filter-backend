@@ -9,3 +9,8 @@ firebase-service-account.json
 .env.production
 
 dist/
+
+.env.yaml
+.env.production.yaml
+.env.development.yaml
+.env.test.yaml

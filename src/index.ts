@@ -18,41 +18,26 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
   console.log(`Created uploads directory at ${uploadsDir}`);
 }
-// Add explicit CORS headers before other middleware
-app.use((req: Request, res: Response, next: NextFunction) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-  );
 
-  // Handle preflight requests
-  if (req.method === "OPTIONS") {
-    res.status(200).end();
-    return;
-  }
-
-  next();
-});
-
-// Configure CORS to allow requests from any origin during development
+// Configure CORS properly
 const corsOptions = {
   origin: "*", // Allow all origins
-  methods: ["GET", "POST", "OPTIONS"], // Allow GET and POST methods
-  allowedHeaders: ["Content-Type", "Authorization"], // Allow these headers
-  optionsSuccessStatus: 200, // For legacy browser support
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 200,
 };
+
+// Apply CORS middleware first
+app.use(cors(corsOptions));
 
 // Increase the payload size limits
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Apply CORS middleware with options
-app.use(cors(corsOptions));
-
-// Routes - using the simplified route
+// Routes
 app.use("/generate", verifyToken, generateRoute);
+
 app.post("/register-device", express.json(), async (req, res) => {
   try {
     const { deviceToken, platform } = req.body;
@@ -69,13 +54,14 @@ app.post("/register-device", express.json(), async (req, res) => {
     res.status(500).json({ error: "Failed to register device" });
   }
 });
+
 // Simple health check endpoint
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Use PORT from environment variable or fallback to 3000
-const PORT = process.env.PORT || 3000;
+// Use PORT from environment variable, default to 8080 for Cloud Run
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () =>
   console.log(`Server running at http://localhost:${PORT}`)
 );
