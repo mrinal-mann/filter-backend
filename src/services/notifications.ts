@@ -1,9 +1,10 @@
 /**
- * Notification Service
+ * Notification Service with Exponential Backoff
  * Handles FCM notifications from the backend to the frontend
  */
 import fetch from "node-fetch";
 import dotenv from "dotenv";
+import { getUserToken } from './tokenService';
 
 // Load environment variables
 dotenv.config();
@@ -38,69 +39,121 @@ async function getFCMAuthToken(): Promise<string> {
 }
 
 /**
- * Sends an FCM notification when image processing is complete
- *
- * @param deviceToken The FCM token of the target device
- * @param title Notification title
- * @param body Notification body
- * @param data Additional data to send with the notification
- * @returns Promise with the FCM response
+ * Sleep function for delays
  */
-async function sendNotification(
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Sends an FCM notification with exponential backoff retry
+ */
+async function sendNotificationWithRetry(
+  messageBody: any,
+  maxRetries: number = 3
+): Promise<any> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Get fresh token for each retry in case it expired
+      const fcmToken = await getFCMAuthToken();
+
+      // Send to FCM
+      const response = await fetch(FCM_API_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${fcmToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(messageBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`FCM error: ${JSON.stringify(errorData)}`);
+      }
+
+      // Success!
+      return await response.json();
+      
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`Attempt ${attempt} failed:`, error);
+
+      if (attempt < maxRetries) {
+        // Exponential backoff: 1s, 2s, 4s...
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        console.log(`Retrying in ${delay}ms...`);
+        await sleep(delay);
+      }
+    }
+  }
+
+  // All retries failed
+  throw lastError || new Error('Failed to send notification after retries');
+}
+
+/**
+ * Sends a notification to a specific device
+ */
+export async function sendNotification(
   deviceToken: string,
   imageUrl: string,
   filterType: string
 ): Promise<any> {
-  try {
-    // Get FCM OAuth token from the auth service
-    const fcmToken = await getFCMAuthToken();
-
-    // Build message payload according to FCM v1 format
-    const messageBody = {
-      message: {
-        token: deviceToken,
+  // Build message payload according to FCM v1 format
+  const messageBody = {
+    message: {
+      token: deviceToken,
+      notification: {
+        title: "Image Ready!",
+        body: `Your ${filterType} filter has been applied successfully.`,
+      },
+      data: {
+        notificationType: "image_ready",
+        imageUrl: imageUrl,
+        filterType: filterType,
+        channelId: "image-processing",
+        experienceId: "@pixmix/filter-frontend",
+        scopeKey: "@pixmix/filter-frontend",
+      },
+      android: {
         notification: {
-          title: "Image Ready!",
-          body: `Your ${filterType} filter has been applied successfully.`,
-        },
-        data: {
-          notificationType: "image_ready",
-          imageUrl: imageUrl,
-          filterType: filterType,
-          channelId: "image-processing",
-          experienceId: "@pixmix/filter-frontend",
-          scopeKey: "@pixmix/filter-frontend",
-        },
-        android: {
-          notification: {
-            channel_id: "image-processing",
-            notification_priority: "PRIORITY_HIGH",
-          },
+          channel_id: "image-processing",
+          priority: "HIGH",
         },
       },
-    };
+      apns: {
+        payload: {
+          aps: {
+            sound: "default",
+            badge: 1,
+          }
+        }
+      }
+    },
+  };
 
-    // Send to FCM
-    const response = await fetch(FCM_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${fcmToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(messageBody),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`FCM error: ${JSON.stringify(errorData)}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error("Error sending notification:", error);
-    throw error;
-  }
+  return sendNotificationWithRetry(messageBody);
 }
 
-// Export the functions
-export { getFCMAuthToken, sendNotification };
+/**
+ * Sends a notification to a user by their ID
+ */
+export async function sendNotificationToUser(
+  userId: string,
+  imageUrl: string,
+  filterType: string
+): Promise<any> {
+  const deviceToken = await getUserToken(userId);
+  
+  if (!deviceToken) {
+    throw new Error(`No FCM token found for user ${userId}`);
+  }
+
+  return sendNotification(deviceToken, imageUrl, filterType);
+}
+
+// Export all functions
+export { getFCMAuthToken };

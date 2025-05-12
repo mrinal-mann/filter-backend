@@ -1,13 +1,13 @@
 // src/index.ts
-import express, { NextFunction, Request, Response } from "express";
+import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import generateRoute from "./routes/generate";
+import { verifyToken } from "./middleware/authMiddleware";
+import { storeUserToken } from "./services/tokenService";
 import fs from "fs";
 import path from "path";
-import { verifyToken } from "./middleware/authMiddleware";
-import { firestore } from "./config/firebase";
-import admin from "firebase-admin";
+
 // Load environment variables from .env.production
 dotenv.config({ path: ".env.production" });
 
@@ -39,22 +39,26 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 // Routes
 app.use("/generate", verifyToken, generateRoute);
 
-app.post("/register-device", verifyToken, async (req, res) => {
+// Token registration endpoint
+app.post("/register-token", async (req: any, res: any) => {
   try {
-    const { deviceToken, platform } = req.body;
-    const userId = req.user?.uid;
+    const { userId, fcmToken, platform } = req.body;
 
-    await firestore.collection("devices").doc(deviceToken).set({
-      token: deviceToken,
-      platform,
-      userId,
-      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    if (!userId || !fcmToken) {
+      return res.status(400).json({
+        error: "Missing required fields: userId and fcmToken",
+      });
+    }
+
+    await storeUserToken(userId, fcmToken, platform);
+
+    res.json({
+      success: true,
+      message: "Token registered successfully",
     });
-
-    res.json({ success: true });
   } catch (error) {
-    console.error("Device registration error:", error);
-    res.status(500).json({ error: "Failed to register device" });
+    console.error("Token registration error:", error);
+    res.status(500).json({ error: "Failed to register token" });
   }
 });
 
