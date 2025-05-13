@@ -1,46 +1,33 @@
-// src/index.ts
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import generateRoute from "./routes/generate";
-import { verifyToken } from "./middleware/authMiddleware";
+import { verifyCloudRunToken } from "./middleware/authMiddleware";
 import { storeUserToken } from "./services/tokenService";
-import fs from "fs";
-import path from "path";
 
-// Load environment variables from .env.production
+// Load environment configuration
 dotenv.config({ path: ".env.production" });
 
 const app = express();
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-  console.log(`Created uploads directory at ${uploadsDir}`);
-}
-
-// Configure CORS properly
+// CORS configuration
 const corsOptions = {
-  origin: "*", // Allow all origins
+  origin: "*", // In production, specify allowed origins
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
   optionsSuccessStatus: 200,
 };
 
-// Apply CORS middleware first
 app.use(cors(corsOptions));
-
-// Increase the payload size limits
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Routes
-app.use("/generate", verifyToken, generateRoute);
+// Protected routes
+app.use("/generate", verifyCloudRunToken, generateRoute);
 
-// Token registration endpoint
-app.post("/register-token", async (req: any, res: any) => {
+// Token registration endpoint (for storing FCM tokens)
+app.post("/register-token", async (req, res): Promise<any> => {
   try {
     const { userId, fcmToken, platform } = req.body;
 
@@ -62,13 +49,10 @@ app.post("/register-token", async (req: any, res: any) => {
   }
 });
 
-// Simple health check endpoint
+// Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// Use PORT from environment variable, default to 8080 for Cloud Run
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () =>
-  console.log(`Server running at http://localhost:${PORT}`)
-);
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+app.listen(PORT, () => console.log(`Filter Backend running on port ${PORT}`));
